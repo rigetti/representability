@@ -29,7 +29,7 @@ form--e.g. mathematically indexed by geminals instead of monomials
 vectorized index '2'.  This is useful when defining a vector space of an aggregate of Tensor objects.  When a basis is
 defined on the Tensor index_vectorized uses the basis.rev() to get the position in a symmetrized form.
 
-Features of MuliTensor()
+Features of MultiTensor()
 ------------------------
 
 * As the name suggests this is an object that aggregates Tensor objects together to define a vector space.
