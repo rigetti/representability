@@ -1,0 +1,12 @@
+numpy
+scipy
+pytest
+pytest-cov
+cvxpy
+pyquil==1.9
+referenceqvm
+quantum-grove
+openfermion
+openfermionpsi4
+openfermionpyscf
+forestopenfermion
