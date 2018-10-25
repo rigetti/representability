@@ -124,6 +124,7 @@ def v2rdm_cvvxpy(one_body_ints, two_body_ints, Na, Nb):
 
 if __name__ == "__main__":
     # solve the spin problem
+    import sys
     from openfermion.hamiltonians import MolecularData
     from openfermionpsi4 import run_psi4
     from openfermion.utils import map_one_pdm_to_one_hole_dm, map_two_pdm_to_two_hole_dm, map_two_pdm_to_particle_hole_dm
@@ -135,8 +136,13 @@ if __name__ == "__main__":
     print('Running System Setup')
     basis = 'sto-3g'
     multiplicity = 1
+    # charge = 0
+    # geometry = [('H', [0.0, 0.0, 0.0]), ('H', [0, 0, 0.75])]
+    # charge = 1
+    # geometry = [('H', [0.0, 0.0, 0.0]), ('He', [0, 0, 0.75])]
     charge = 0
-    geometry = [('H', [0.0, 0.0, 0.0]), ('H', [0, 0, 0.75])]
+    geometry = [('H', [0.0, 0.0, 0.0]), ('H', [0, 0, 0.75]),
+                ('H', [0.0, 0.0, 2 * 0.75]), ('H', [0, 0, 3 * 0.75])]
     molecule = MolecularData(geometry, basis, multiplicity, charge)
     # Run Psi4.
     molecule = run_psi4(molecule,
@@ -152,7 +158,7 @@ if __name__ == "__main__":
     nuclear_repulsion = molecule.nuclear_repulsion
     gs_energy = molecule.fci_energy
 
-    tpdm = molecule.fci_two_rdm
+    tpdm = np.einsum('ijkl->ijlk', molecule.fci_two_rdm)
     opdm = molecule.fci_one_rdm
     oqdm = map_one_pdm_to_one_hole_dm(opdm)
     tqdm = map_two_pdm_to_two_hole_dm(tpdm, opdm)
@@ -207,7 +213,9 @@ if __name__ == "__main__":
 
     print("constructing the problem")
     # construct the problem variable for cvx
-    interaction_integral_matrix = np.einsum('ijkl->ijlk', v2.data).reshape((dim**2, dim**2))
+    # interaction_integral_matrix = np.einsum('ijkl->ijlk', v2.data).reshape((dim**2, dim**2))
+    interaction_integral_matrix = v2.data.reshape((dim**2, dim**2))
+
     objective = cvx.Minimize(
                 cvx.trace(copdm.data * variable_dictionary['ck']) +
                 cvx.trace(interaction_integral_matrix * variable_dictionary['cckk']))
@@ -215,10 +223,13 @@ if __name__ == "__main__":
     cvx_problem = cvx.Problem(objective, constraints=constraints)
     print('problem constructed')
 
-    cvx_problem.solve(solver=cvx.SCS)
+    one_energy = np.trace(copdm.data.dot(opdm.data))
+    two_energy = np.trace(interaction_integral_matrix @ tpdm.data.reshape((dim**2, dim**2)))  # np.einsum('ijkl,ijkl', tpdm.data, ctpdm.data)
+    print(one_energy + two_energy + nuclear_repulsion)
+
+    cvx_problem.solve(solver=cvx.SCS, verbose=True)
     print(cvx_problem.value + nuclear_repulsion, gs_energy)
-    assert np.isclose(cvx_problem.value + nuclear_repulsion, gs_energy)
-    print(variable_dictionary['ck'].value)
-    print(variable_dictionary['ck'].value.trace())
-    print(opdm.data.real)
-    print(opdm.data.trace())
+    # this should give something close to -2.147170020986181
+    # assert np.isclose(cvx_problem.value + nuclear_repulsion, gs_energy)  # for 2-electron systems only
+    assert np.isclose(cvx_problem.value + nuclear_repulsion, -2.147170020986181, rtol=1.0E-4)
+
